@@ -17,7 +17,7 @@ from pypdf import PdfReader, PdfWriter
 # ============================================================
 
 st.set_page_config(
-    page_title="Separador de Documentos Comprobatórios e Comprovantes",
+    page_title="Separador de Documentos Comprobatórios e Comprovante",
     page_icon="📄",
     layout="wide"
 )
@@ -834,7 +834,7 @@ def criar_zip_final(
 # ============================================================
 
 st.title(
-    "📄 Separador de Comprovantes"
+    "📄 Separador de Documentos Comprobatórios e Comprovante"
 )
 
 
