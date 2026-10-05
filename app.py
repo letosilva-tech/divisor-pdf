@@ -17,7 +17,7 @@ from pypdf import PdfReader, PdfWriter
 # ============================================================
 
 st.set_page_config(
-    page_title="Separador de Comprovantes",
+    page_title="Separador de Documentos Comprobatórios e Comprovantes",
     page_icon="📄",
     layout="wide"
 )
