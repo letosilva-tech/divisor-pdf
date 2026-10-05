@@ -13,7 +13,7 @@ from pypdf import PdfReader, PdfWriter
 
 
 # ============================================================
-# CONFIGURAÇÃO DA PÁGINA
+# CONFIGURAÇÃO
 # ============================================================
 
 st.set_page_config(
@@ -29,7 +29,7 @@ st.set_page_config(
 
 def normalizar_texto(texto):
     """
-    Remove acentos, converte para maiúsculas
+    Remove acentos, coloca em maiúsculas
     e normaliza espaços.
     """
 
@@ -65,10 +65,13 @@ def normalizar_texto(texto):
 
 
 # ============================================================
-# NOME SEGURO PARA ARQUIVO
+# NOME SEGURO
 # ============================================================
 
 def nome_seguro(nome):
+    """
+    Remove caracteres problemáticos do nome.
+    """
 
     nome = unicodedata.normalize(
         "NFKD",
@@ -93,126 +96,21 @@ def nome_seguro(nome):
         nome
     )
 
-    return (
-        nome.strip("._")
-        or "arquivo"
-    )
+    nome = nome.strip("._")
+
+    if not nome:
+        nome = "arquivo"
+
+    return nome
 
 
 # ============================================================
-# IDENTIFICAR NOME DO ARQUIVO
-# ============================================================
-
-def identificar_nome_arquivo(texto):
-    """
-    Tenta identificar o nome do arquivo/documento
-    no texto da página.
-
-    Exemplos esperados:
-
-        1097-1026 LETO LTDA
-        10958-1818 JFKAS
-        1065656 MILTON LTDA
-
-    Retorna:
-        nome encontrado
-        ou None
-    """
-
-    if not texto:
-        return None
-
-    linhas = texto.splitlines()
-
-    for linha in linhas:
-
-        linha_original = linha.strip()
-
-        if not linha_original:
-            continue
-
-        linha = normalizar_texto(
-            linha_original
-        )
-
-        # ----------------------------------------------------
-        # PADRÃO 1
-        #
-        # Exemplo:
-        # 1097-1026 LETO LTDA
-        # 10958-1818 JFKAS
-        # ----------------------------------------------------
-
-        padrao_com_hifen = re.match(
-            r"^(\d{3,})-(\d{3,})\s+(.+)$",
-            linha
-        )
-
-        if padrao_com_hifen:
-
-            numero1 = padrao_com_hifen.group(1)
-            numero2 = padrao_com_hifen.group(2)
-            empresa = padrao_com_hifen.group(3).strip()
-
-            if empresa:
-
-                return (
-                    f"{numero1}-{numero2} {empresa}"
-                )
-
-        # ----------------------------------------------------
-        # PADRÃO 2
-        #
-        # Exemplo:
-        # 1065656 MILTON LTDA
-        #
-        # Atenção:
-        # este padrão é mais genérico.
-        # ----------------------------------------------------
-
-        padrao_sem_hifen = re.match(
-            r"^(\d{5,})\s+([A-Z][A-Z0-9 .&/-]{2,})$",
-            linha
-        )
-
-        if padrao_sem_hifen:
-
-            numero = padrao_sem_hifen.group(1)
-            empresa = padrao_sem_hifen.group(2).strip()
-
-            # Evita considerar linhas muito comuns
-            palavras_proibidas = [
-                "PAGAMENTO",
-                "COMPROVANTE",
-                "TRANSFERENCIA",
-                "TRANSACAO",
-                "DOCUMENTO",
-                "NUMERO",
-                "CODIGO",
-                "VALOR",
-                "DATA",
-                "BANCO",
-                "CONTA",
-                "AGENCIA",
-            ]
-
-            if empresa not in palavras_proibidas:
-
-                return (
-                    f"{numero} {empresa}"
-                )
-
-    return None
-
-
-# ============================================================
-# IDENTIFICAÇÃO DO COMPROVANTE
+# IDENTIFICAR COMPROVANTE
 # ============================================================
 
 def identificar_comprovante(texto):
     """
-    Identifica se a página possui características
-    de um comprovante.
+    Identifica se uma página é comprovante.
 
     Retorna:
 
@@ -223,7 +121,9 @@ def identificar_comprovante(texto):
         None
     """
 
-    texto = normalizar_texto(texto)
+    texto = normalizar_texto(
+        texto
+    )
 
     if not texto:
         return None
@@ -235,14 +135,19 @@ def identificar_comprovante(texto):
     padroes_pix = [
 
         r"\bCOMPROVANTE\s+DE\s+PIX\b",
+
         r"\bCOMPROVANTE\s+PIX\b",
+
         r"\bCOMPROVANTE\s+DO\s+PIX\b",
 
         r"\bPIX\s+REALIZADO\b",
+
         r"\bPIX\s+EFETUADO\b",
+
         r"\bPAGAMENTO\s+PIX\b",
 
         r"\bPIX\s+ENVIADO\b",
+
         r"\bPIX\s+RECEBIDO\b",
 
         r"\bPAGAMENTO\s+REALIZADO\s+VIA\s+PIX\b",
@@ -268,22 +173,31 @@ def identificar_comprovante(texto):
     padroes_transferencia = [
 
         r"\bCOMPROVANTE\s+DE\s+TRANSFERENCIA\b",
+
         r"\bCOMPROVANTE\s+TRANSFERENCIA\b",
+
         r"\bCOMPROVANTE\s+DA\s+TRANSFERENCIA\b",
 
         r"\bTRANSFERENCIA\s+REALIZADA\b",
+
         r"\bTRANSFERENCIA\s+EFETUADA\b",
+
         r"\bTRANSFERENCIA\s+BANCARIA\b",
+
         r"\bTRANSFERENCIA\s+ELETRONICA\b",
+
         r"\bTRANSFERENCIA\s+CONCLUIDA\b",
 
         r"\bCOMPROVANTE\s+TED\b",
+
         r"\bCOMPROVANTE\s+DOC\b",
 
         r"\bTED\s+REALIZADA\b",
+
         r"\bTED\s+EFETUADA\b",
 
         r"\bDOC\s+REALIZADO\b",
+
         r"\bDOC\s+EFETUADO\b",
     ]
 
@@ -297,21 +211,27 @@ def identificar_comprovante(texto):
             return "TRANSFERENCIA"
 
     # ========================================================
-    # COMPROVANTE DE PAGAMENTO
+    # PAGAMENTO
     # ========================================================
 
     padroes_pagamento = [
 
         r"\bCOMPROVANTE\s+DE\s+PAGAMENTO\b",
+
         r"\bCOMPROVANTE\s+PAGAMENTO\b",
+
         r"\bCOMPROVANTE\s+DO\s+PAGAMENTO\b",
 
         r"\bCOMPROVANTE\s+DE\s+PAGAMENTO\s+BANCARIO\b",
+
         r"\bCOMPROVANTE\s+DE\s+PAGAMENTO\s+ONLINE\b",
 
         r"\bPAGAMENTO\s+REALIZADO\b",
+
         r"\bPAGAMENTO\s+EFETUADO\b",
+
         r"\bPAGAMENTO\s+CONCLUIDO\b",
+
         r"\bPAGAMENTO\s+CONFIRMADO\b",
     ]
 
@@ -331,13 +251,17 @@ def identificar_comprovante(texto):
     padroes_transacao = [
 
         r"\bCOMPROVANTE\s+DE\s+TRANSACAO\s+BANCARIA\b",
+
         r"\bCOMPROVANTE\s+TRANSACAO\s+BANCARIA\b",
 
         r"\bCOMPROVANTE\s+DE\s+TRANSACAO\b",
 
         r"\bTRANSACAO\s+BANCARIA\b",
+
         r"\bTRANSACAO\s+REALIZADA\b",
+
         r"\bTRANSACAO\s+EFETUADA\b",
+
         r"\bTRANSACAO\s+CONCLUIDA\b",
     ]
 
@@ -354,7 +278,7 @@ def identificar_comprovante(texto):
 
 
 # ============================================================
-# FORMATAÇÃO DE TAMANHO
+# TAMANHO DO ARQUIVO
 # ============================================================
 
 def formatar_tamanho(tamanho):
@@ -363,12 +287,18 @@ def formatar_tamanho(tamanho):
         return "0 B"
 
     if tamanho < 1024:
+
         return f"{tamanho} B"
 
     if tamanho < 1024 * 1024:
-        return f"{tamanho / 1024:.2f} KB"
 
-    return f"{tamanho / (1024 * 1024):.2f} MB"
+        return (
+            f"{tamanho / 1024:.2f} KB"
+        )
+
+    return (
+        f"{tamanho / (1024 * 1024):.2f} MB"
+    )
 
 
 # ============================================================
@@ -380,21 +310,20 @@ def criar_pdf_em_memoria(
     indices_paginas
 ):
     """
-    Cria um PDF em memória contendo somente
-    as páginas informadas.
+    Cria um novo PDF somente com as páginas
+    informadas.
     """
 
     if not indices_paginas:
+
         return None
 
     writer = PdfWriter()
 
     for indice in indices_paginas:
 
-        pagina = reader.pages[indice]
-
         writer.add_page(
-            pagina
+            reader.pages[indice]
         )
 
     buffer = io.BytesIO()
@@ -411,24 +340,50 @@ def criar_pdf_em_memoria(
 
 
 # ============================================================
-# PROCESSAMENTO PRINCIPAL
+# PROCESSAR UM PDF
 # ============================================================
 
-def processar_pdf(
-    caminho_pdf,
+def processar_um_pdf(
+    arquivo_enviado,
+    pasta_trabalho,
+    numero_arquivo,
+    total_arquivos,
     progress_bar,
     status
 ):
+    """
+    Processa um único PDF.
+    """
 
     inicio = time.time()
 
-    # ========================================================
-    # ABRIR PDF
-    # ========================================================
+    nome_original = arquivo_enviado.name
 
-    status.info(
-        "📖 Abrindo PDF..."
+    # --------------------------------------------------------
+    # SALVAR TEMPORARIAMENTE
+    # --------------------------------------------------------
+
+    nome_temporario = nome_seguro(
+        nome_original
     )
+
+    caminho_pdf = os.path.join(
+        pasta_trabalho,
+        nome_temporario
+    )
+
+    with open(
+        caminho_pdf,
+        "wb"
+    ) as arquivo:
+
+        arquivo.write(
+            arquivo_enviado.getbuffer()
+        )
+
+    # --------------------------------------------------------
+    # ABRIR PDF
+    # --------------------------------------------------------
 
     reader = PdfReader(
         caminho_pdf,
@@ -445,28 +400,31 @@ def processar_pdf(
             "O PDF não possui páginas."
         )
 
-    # ========================================================
-    # ESTRUTURA DOS ARQUIVOS
-    # ========================================================
+    # --------------------------------------------------------
+    # LISTAS
+    # --------------------------------------------------------
 
-    arquivos = {}
+    paginas_comprovantes = []
 
-    arquivo_atual = None
+    paginas_sem_comprovantes = []
 
     diagnostico = []
 
-    # ========================================================
+    # --------------------------------------------------------
     # CONTADORES
-    # ========================================================
+    # --------------------------------------------------------
 
     quantidade_pix = 0
+
     quantidade_transferencia = 0
+
     quantidade_pagamento = 0
+
     quantidade_transacao = 0
 
-    # ========================================================
+    # --------------------------------------------------------
     # ANALISAR PÁGINAS
-    # ========================================================
+    # --------------------------------------------------------
 
     for indice in range(
         total_paginas
@@ -474,14 +432,37 @@ def processar_pdf(
 
         numero_pagina = indice + 1
 
-        status.info(
-            f"🔍 Analisando página "
-            f"{numero_pagina} de "
-            f"{total_paginas}..."
+        # Progresso do PDF atual
+
+        progresso_pdf = (
+            numero_pagina
+            /
+            total_paginas
         )
 
+        # Progresso geral
+
+        progresso_geral = (
+            (
+                numero_arquivo - 1
+            )
+            +
+            progresso_pdf
+        ) / total_arquivos
+
         progress_bar.progress(
-            numero_pagina / total_paginas * 0.70
+            min(
+                progresso_geral * 0.85,
+                0.85
+            )
+        )
+
+        status.info(
+            f"📄 PDF {numero_arquivo} de "
+            f"{total_arquivos} | "
+            f"{nome_original} | "
+            f"Página {numero_pagina} de "
+            f"{total_paginas}"
         )
 
         pagina = reader.pages[indice]
@@ -508,46 +489,7 @@ def processar_pdf(
             )
 
         # ----------------------------------------------------
-        # TENTAR IDENTIFICAR NOVO ARQUIVO
-        # ----------------------------------------------------
-
-        nome_encontrado = identificar_nome_arquivo(
-            texto
-        )
-
-        if nome_encontrado:
-
-            arquivo_atual = nome_encontrado
-
-            if arquivo_atual not in arquivos:
-
-                arquivos[
-                    arquivo_atual
-                ] = {
-
-                    "sem_comprovantes": [],
-
-                    "comprovantes": [],
-
-                    "tipos": [],
-                }
-
-        # ----------------------------------------------------
-        # SE NÃO EXISTE NOME AINDA
-        # ----------------------------------------------------
-
-        if arquivo_atual is None:
-
-            diagnostico.append(
-                f"Página {numero_pagina}: "
-                f"não foi possível identificar "
-                f"o nome do arquivo."
-            )
-
-            continue
-
-        # ----------------------------------------------------
-        # IDENTIFICAR COMPROVANTE
+        # IDENTIFICAR TIPO
         # ----------------------------------------------------
 
         tipo = identificar_comprovante(
@@ -560,34 +502,24 @@ def processar_pdf(
 
         if tipo is not None:
 
-            arquivos[
-                arquivo_atual
-            ][
-                "comprovantes"
-            ].append(
+            paginas_comprovantes.append(
                 indice
             )
 
-            arquivos[
-                arquivo_atual
-            ][
-                "tipos"
-            ].append(
-                tipo
-            )
-
-            # Contadores
-
             if tipo == "PIX":
+
                 quantidade_pix += 1
 
             elif tipo == "TRANSFERENCIA":
+
                 quantidade_transferencia += 1
 
             elif tipo == "PAGAMENTO":
+
                 quantidade_pagamento += 1
 
             elif tipo == "TRANSACAO_BANCARIA":
+
                 quantidade_transacao += 1
 
         # ----------------------------------------------------
@@ -596,218 +528,122 @@ def processar_pdf(
 
         else:
 
-            arquivos[
-                arquivo_atual
-            ][
-                "sem_comprovantes"
-            ].append(
+            paginas_sem_comprovantes.append(
                 indice
             )
 
-    # ========================================================
-    # VALIDAR
-    # ========================================================
+    # --------------------------------------------------------
+    # CONFERÊNCIA
+    # --------------------------------------------------------
 
-    if not arquivos:
+    total_classificado = (
+        len(paginas_comprovantes)
+        +
+        len(paginas_sem_comprovantes)
+    )
+
+    if total_classificado != total_paginas:
 
         raise ValueError(
-            "Nenhum arquivo foi identificado no PDF.\n\n"
-            "Verifique se o nome dos arquivos aparece "
-            "como texto no PDF."
+            f"Nem todas as páginas foram "
+            f"classificadas.\n"
+            f"PDF: {nome_original}\n"
+            f"Total: {total_paginas}\n"
+            f"Classificadas: {total_classificado}"
         )
 
-    # ========================================================
-    # CRIAR PDFs INDIVIDUAIS
-    # ========================================================
+    # --------------------------------------------------------
+    # CONFERIR DUPLICIDADE
+    # --------------------------------------------------------
+
+    conjunto_comprovantes = set(
+        paginas_comprovantes
+    )
+
+    conjunto_sem_comprovantes = set(
+        paginas_sem_comprovantes
+    )
+
+    duplicadas = (
+        conjunto_comprovantes
+        &
+        conjunto_sem_comprovantes
+    )
+
+    if duplicadas:
+
+        raise ValueError(
+            "Existem páginas classificadas "
+            "nos dois grupos."
+        )
+
+    # --------------------------------------------------------
+    # CRIAR PDF DE COMPROVANTES
+    # --------------------------------------------------------
 
     status.info(
-        "💾 Criando arquivos separados..."
+        f"💾 Separando comprovantes: "
+        f"{nome_original}"
     )
 
-    progress_bar.progress(
-        0.75
+    dados_comprovantes = criar_pdf_em_memoria(
+        reader,
+        paginas_comprovantes
     )
 
-    resultados_arquivos = {}
-
-    for nome_arquivo, dados in arquivos.items():
-
-        resultados_arquivos[
-            nome_arquivo
-        ] = {
-
-            "sem_comprovantes": criar_pdf_em_memoria(
-                reader,
-                dados[
-                    "sem_comprovantes"
-                ]
-            ),
-
-            "comprovantes": criar_pdf_em_memoria(
-                reader,
-                dados[
-                    "comprovantes"
-                ]
-            ),
-
-            "paginas_sem_comprovantes": [
-                pagina + 1
-                for pagina in dados[
-                    "sem_comprovantes"
-                ]
-            ],
-
-            "paginas_comprovantes": [
-                pagina + 1
-                for pagina in dados[
-                    "comprovantes"
-                ]
-            ],
-
-            "tipos": dados[
-                "tipos"
-            ],
-        }
-
-    # ========================================================
-    # CRIAR ZIP
-    # ========================================================
+    # --------------------------------------------------------
+    # CRIAR PDF SEM COMPROVANTES
+    # --------------------------------------------------------
 
     status.info(
-        "📦 Criando ZIP..."
+        f"💾 Separando documentos sem "
+        f"comprovantes: {nome_original}"
     )
 
-    progress_bar.progress(
-        0.90
+    dados_sem_comprovantes = criar_pdf_em_memoria(
+        reader,
+        paginas_sem_comprovantes
     )
 
-    buffer_zip = io.BytesIO()
-
-    with zipfile.ZipFile(
-        buffer_zip,
-        "w",
-        compression=zipfile.ZIP_DEFLATED,
-        compresslevel=1
-    ) as zip_file:
-
-        # ====================================================
-        # PASTA SEM COMPROVANTES
-        # ====================================================
-
-        for nome_arquivo, dados in resultados_arquivos.items():
-
-            dados_pdf = dados[
-                "sem_comprovantes"
-            ]
-
-            if dados_pdf:
-
-                nome_pdf = (
-                    nome_seguro(
-                        nome_arquivo
-                    )
-                    + ".pdf"
-                )
-
-                caminho_zip = (
-                    "SEM_COMPROVANTES/"
-                    + nome_pdf
-                )
-
-                zip_file.writestr(
-                    caminho_zip,
-                    dados_pdf
-                )
-
-        # ====================================================
-        # PASTA COMPROVANTES
-        # ====================================================
-
-        for nome_arquivo, dados in resultados_arquivos.items():
-
-            dados_pdf = dados[
-                "comprovantes"
-            ]
-
-            if dados_pdf:
-
-                nome_pdf = (
-                    nome_seguro(
-                        nome_arquivo
-                    )
-                    + ".pdf"
-                )
-
-                caminho_zip = (
-                    "COMPROVANTES/"
-                    + nome_pdf
-                )
-
-                zip_file.writestr(
-                    caminho_zip,
-                    dados_pdf
-                )
-
-    buffer_zip.seek(0)
-
-    dados_zip = buffer_zip.getvalue()
-
-    # ========================================================
-    # TAMANHO
-    # ========================================================
-
-    tamanho_zip = len(
-        dados_zip
-    )
-
-    # ========================================================
-    # TOTAL DE PÁGINAS
-    # ========================================================
-
-    total_sem_comprovantes = 0
-    total_comprovantes = 0
-
-    for dados in resultados_arquivos.values():
-
-        total_sem_comprovantes += len(
-            dados[
-                "paginas_sem_comprovantes"
-            ]
-        )
-
-        total_comprovantes += len(
-            dados[
-                "paginas_comprovantes"
-            ]
-        )
-
-    # ========================================================
-    # TEMPO
-    # ========================================================
-
-    tempo_total = (
-        time.time() - inicio
-    )
-
-    # ========================================================
+    # --------------------------------------------------------
     # RESULTADO
-    # ========================================================
+    # --------------------------------------------------------
 
     resultado = {
+
+        "nome_original":
+            nome_original,
+
+        "dados_comprovantes":
+            dados_comprovantes,
+
+        "dados_sem_comprovantes":
+            dados_sem_comprovantes,
 
         "total_paginas":
             total_paginas,
 
-        "total_arquivos":
+        "total_comprovantes":
             len(
-                resultados_arquivos
+                paginas_comprovantes
             ),
 
-        "total_comprovantes":
-            total_comprovantes,
-
         "total_sem_comprovantes":
-            total_sem_comprovantes,
+            len(
+                paginas_sem_comprovantes
+            ),
+
+        "paginas_comprovantes":
+            [
+                pagina + 1
+                for pagina in paginas_comprovantes
+            ],
+
+        "paginas_sem_comprovantes":
+            [
+                pagina + 1
+                for pagina in paginas_sem_comprovantes
+            ],
 
         "quantidade_pix":
             quantidade_pix,
@@ -821,33 +657,169 @@ def processar_pdf(
         "quantidade_transacao":
             quantidade_transacao,
 
-        "arquivos":
-            resultados_arquivos,
-
-        "dados_zip":
-            dados_zip,
-
-        "tamanho_zip":
-            tamanho_zip,
-
         "diagnostico":
             diagnostico,
 
         "tempo_total":
-            tempo_total,
+            time.time() - inicio,
     }
 
-    progress_bar.progress(
-        1.0
-    )
+    # --------------------------------------------------------
+    # LIMPEZA
+    # --------------------------------------------------------
 
-    status.success(
-        "✅ Processamento concluído!"
-    )
+    try:
+
+        os.remove(
+            caminho_pdf
+        )
+
+    except Exception:
+
+        pass
 
     gc.collect()
 
     return resultado
+
+
+# ============================================================
+# CRIAR ZIP
+# ============================================================
+
+def criar_zip_final(
+    resultados
+):
+    """
+    Cria:
+
+    RESULTADO_COMPROVANTES.zip
+
+    ├── SEM_COMPROVANTES
+    └── COMPROVANTES
+    """
+
+    buffer_zip = io.BytesIO()
+
+    # Controle para nomes duplicados
+    nomes_usados_sem = set()
+
+    nomes_usados_com = set()
+
+    with zipfile.ZipFile(
+        buffer_zip,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=1
+    ) as zip_file:
+
+        # ====================================================
+        # SEM COMPROVANTES
+        # ====================================================
+
+        for resultado in resultados:
+
+            dados_pdf = resultado[
+                "dados_sem_comprovantes"
+            ]
+
+            if not dados_pdf:
+
+                continue
+
+            nome_pdf = nome_seguro(
+                resultado[
+                    "nome_original"
+                ]
+            )
+
+            nome_final = nome_pdf
+
+            contador = 2
+
+            while nome_final.lower() in nomes_usados_sem:
+
+                base, extensao = os.path.splitext(
+                    nome_pdf
+                )
+
+                nome_final = (
+                    f"{base}_{contador}"
+                    f"{extensao}"
+                )
+
+                contador += 1
+
+            nomes_usados_sem.add(
+                nome_final.lower()
+            )
+
+            caminho_zip = (
+                "SEM_COMPROVANTES/"
+                +
+                nome_final
+            )
+
+            zip_file.writestr(
+                caminho_zip,
+                dados_pdf
+            )
+
+        # ====================================================
+        # COMPROVANTES
+        # ====================================================
+
+        for resultado in resultados:
+
+            dados_pdf = resultado[
+                "dados_comprovantes"
+            ]
+
+            if not dados_pdf:
+
+                continue
+
+            nome_pdf = nome_seguro(
+                resultado[
+                    "nome_original"
+                ]
+            )
+
+            nome_final = nome_pdf
+
+            contador = 2
+
+            while nome_final.lower() in nomes_usados_com:
+
+                base, extensao = os.path.splitext(
+                    nome_pdf
+                )
+
+                nome_final = (
+                    f"{base}_{contador}"
+                    f"{extensao}"
+                )
+
+                contador += 1
+
+            nomes_usados_com.add(
+                nome_final.lower()
+            )
+
+            caminho_zip = (
+                "COMPROVANTES/"
+                +
+                nome_final
+            )
+
+            zip_file.writestr(
+                caminho_zip,
+                dados_pdf
+            )
+
+    buffer_zip.seek(0)
+
+    return buffer_zip.getvalue()
 
 
 # ============================================================
@@ -858,63 +830,107 @@ st.title(
     "📄 Separador de Comprovantes"
 )
 
-st.write(
+st.markdown(
     """
-O sistema analisa o PDF e identifica cada arquivo/documento
-individualmente.
+### Como funciona
 
-Para cada arquivo identificado serão criados:
+Selecione **vários PDFs de uma vez**.
 
-📁 **SEM_COMPROVANTES**
+Cada PDF será analisado individualmente e suas páginas
+serão separadas em:
 
-📁 **COMPROVANTES**
+🟢 **SEM_COMPROVANTES**
 
-Os arquivos são mantidos separados pelo nome identificado
-no PDF.
+🔵 **COMPROVANTES**
+
+O **nome original do PDF será preservado**.
 """
 )
 
 st.info(
     """
-💡 Exemplo:
+📦 Exemplo do resultado:
 
-**SEM_COMPROVANTES**
-- 1097-1026 LETO LTDA.pdf
-- 10958-1818 JFKAS.pdf
-- 1065656 MILTON LTDA.pdf
+RESULTADO_COMPROVANTES.zip
 
-**COMPROVANTES**
-- 1097-1026 LETO LTDA.pdf
-- 10958-1818 JFKAS.pdf
-- 1065656 MILTON LTDA.pdf
+├── 📁 SEM_COMPROVANTES
+│   ├── 16774-2025-onseca.pdf
+│   ├── 16776-2025-iranda.pdf
+│   └── 16777-2025-costa.pdf
+│
+└── 📁 COMPROVANTES
+    ├── 16774-2025-onseca.pdf
+    ├── 16776-2025-iranda.pdf
+    └── 16777-2025-costa.pdf
 """
 )
 
 
 # ============================================================
-# UPLOAD
+# UPLOAD MÚLTIPLO
 # ============================================================
 
-arquivo_enviado = st.file_uploader(
-    "Selecione o PDF que deseja processar",
-    type=["pdf"]
+arquivos_enviados = st.file_uploader(
+    "Selecione os PDFs que deseja processar",
+    type=["pdf"],
+    accept_multiple_files=True,
+    key="upload_pdfs"
 )
 
 
-if arquivo_enviado is not None:
+# ============================================================
+# EXISTEM ARQUIVOS
+# ============================================================
+
+if arquivos_enviados:
 
     st.success(
-        f"Arquivo selecionado: "
-        f"**{arquivo_enviado.name}** "
-        f"({formatar_tamanho(arquivo_enviado.size)})"
+        f"📄 {len(arquivos_enviados)} "
+        f"PDF(s) selecionado(s)."
     )
+
+    # ========================================================
+    # ARQUIVOS SELECIONADOS
+    # ========================================================
+
+    with st.expander(
+        f"📋 Ver {len(arquivos_enviados)} "
+        f"arquivo(s) selecionado(s)",
+        expanded=True
+    ):
+
+        for numero, arquivo in enumerate(
+            arquivos_enviados,
+            start=1
+        ):
+
+            col1, col2 = st.columns(
+                [5, 1]
+            )
+
+            with col1:
+
+                st.write(
+                    f"**{numero}.** "
+                    f"{arquivo.name}"
+                )
+
+            with col2:
+
+                st.write(
+                    formatar_tamanho(
+                        arquivo.size
+                    )
+                )
+
+    st.divider()
 
     # ========================================================
     # BOTÃO PROCESSAR
     # ========================================================
 
     if st.button(
-        "🚀 Processar PDF",
+        "🚀 PROCESSAR TODOS OS PDFs",
         type="primary",
         use_container_width=True
     ):
@@ -923,27 +939,7 @@ if arquivo_enviado is not None:
             prefix="separador_comprovantes_"
         )
 
-        caminho_pdf_original = os.path.join(
-            pasta_trabalho,
-            nome_seguro(
-                arquivo_enviado.name
-            )
-        )
-
         try:
-
-            # =================================================
-            # SALVAR PDF ORIGINAL
-            # =================================================
-
-            with open(
-                caminho_pdf_original,
-                "wb"
-            ) as arquivo:
-
-                arquivo.write(
-                    arquivo_enviado.getbuffer()
-                )
 
             # =================================================
             # PROGRESSO
@@ -956,23 +952,166 @@ if arquivo_enviado is not None:
             status = st.empty()
 
             # =================================================
-            # PROCESSAR
+            # VARIÁVEIS
             # =================================================
 
-            resultado = processar_pdf(
-                caminho_pdf_original,
-                progress_bar,
-                status
+            resultados = []
+
+            erros = []
+
+            total_arquivos = len(
+                arquivos_enviados
+            )
+
+            inicio_total = time.time()
+
+            # =================================================
+            # PROCESSAR PDF POR PDF
+            # =================================================
+
+            for numero_arquivo, arquivo_enviado in enumerate(
+                arquivos_enviados,
+                start=1
+            ):
+
+                try:
+
+                    resultado = processar_um_pdf(
+                        arquivo_enviado=arquivo_enviado,
+
+                        pasta_trabalho=pasta_trabalho,
+
+                        numero_arquivo=numero_arquivo,
+
+                        total_arquivos=total_arquivos,
+
+                        progress_bar=progress_bar,
+
+                        status=status
+                    )
+
+                    resultados.append(
+                        resultado
+                    )
+
+                except Exception as erro:
+
+                    erros.append(
+                        {
+                            "arquivo":
+                                arquivo_enviado.name,
+
+                            "erro":
+                                str(erro)
+                        }
+                    )
+
+            # =================================================
+            # VERIFICAR
+            # =================================================
+
+            if not resultados:
+
+                raise ValueError(
+                    "Nenhum PDF foi processado "
+                    "com sucesso."
+                )
+
+            # =================================================
+            # CRIAR ZIP
+            # =================================================
+
+            status.info(
+                "📦 Criando ZIP final..."
+            )
+
+            progress_bar.progress(
+                0.90
+            )
+
+            dados_zip = criar_zip_final(
+                resultados
             )
 
             # =================================================
-            # RESULTADO
+            # FINAL
+            # =================================================
+
+            progress_bar.progress(
+                1.0
+            )
+
+            status.success(
+                "✅ Processamento concluído!"
+            )
+
+            tempo_total = (
+                time.time()
+                -
+                inicio_total
+            )
+
+            # =================================================
+            # ESTATÍSTICAS
+            # =================================================
+
+            total_paginas = sum(
+                resultado[
+                    "total_paginas"
+                ]
+                for resultado in resultados
+            )
+
+            total_comprovantes = sum(
+                resultado[
+                    "total_comprovantes"
+                ]
+                for resultado in resultados
+            )
+
+            total_sem_comprovantes = sum(
+                resultado[
+                    "total_sem_comprovantes"
+                ]
+                for resultado in resultados
+            )
+
+            total_pix = sum(
+                resultado[
+                    "quantidade_pix"
+                ]
+                for resultado in resultados
+            )
+
+            total_transferencias = sum(
+                resultado[
+                    "quantidade_transferencia"
+                ]
+                for resultado in resultados
+            )
+
+            total_pagamentos = sum(
+                resultado[
+                    "quantidade_pagamento"
+                ]
+                for resultado in resultados
+            )
+
+            total_transacoes = sum(
+                resultado[
+                    "quantidade_transacao"
+                ]
+                for resultado in resultados
+            )
+
+            # =================================================
+            # RESULTADO GERAL
             # =================================================
 
             st.divider()
 
             st.subheader(
-                "📊 Resultado"
+                "📊 Resultado geral"
             )
 
             col1, col2, col3, col4 = st.columns(
@@ -980,112 +1119,24 @@ if arquivo_enviado is not None:
             )
 
             col1.metric(
-                "Total de páginas",
-                resultado[
-                    "total_paginas"
-                ]
+                "PDFs processados",
+                len(resultados)
             )
 
             col2.metric(
-                "Arquivos encontrados",
-                resultado[
-                    "total_arquivos"
-                ]
+                "Total de páginas",
+                total_paginas
             )
 
             col3.metric(
                 "Comprovantes",
-                resultado[
-                    "total_comprovantes"
-                ]
+                total_comprovantes
             )
 
             col4.metric(
-                "Tempo",
-                f"{resultado['tempo_total']:.1f}s"
+                "Sem comprovantes",
+                total_sem_comprovantes
             )
-
-            # =================================================
-            # CONFERÊNCIA
-            # =================================================
-
-            st.subheader(
-                "🔐 Conferência"
-            )
-
-            total_classificado = (
-                resultado[
-                    "total_comprovantes"
-                ]
-                +
-                resultado[
-                    "total_sem_comprovantes"
-                ]
-            )
-
-            if (
-                total_classificado
-                ==
-                resultado[
-                    "total_paginas"
-                ]
-            ):
-
-                st.success(
-                    "✅ Todas as páginas foram "
-                    "classificadas corretamente."
-                )
-
-            else:
-
-                st.warning(
-                    "⚠️ Nem todas as páginas "
-                    "foram classificadas."
-                )
-
-            # =================================================
-            # ARQUIVOS IDENTIFICADOS
-            # =================================================
-
-            st.subheader(
-                "📄 Arquivos identificados"
-            )
-
-            for nome_arquivo, dados in resultado[
-                "arquivos"
-            ].items():
-
-                qtd_sem = len(
-                    dados[
-                        "paginas_sem_comprovantes"
-                    ]
-                )
-
-                qtd_comprovantes = len(
-                    dados[
-                        "paginas_comprovantes"
-                    ]
-                )
-
-                st.write(
-                    f"**{nome_arquivo}**"
-                )
-
-                c1, c2 = st.columns(2)
-
-                with c1:
-
-                    st.write(
-                        f"🟢 Sem comprovantes: "
-                        f"**{qtd_sem} página(s)**"
-                    )
-
-                with c2:
-
-                    st.write(
-                        f"🔵 Comprovantes: "
-                        f"**{qtd_comprovantes} página(s)**"
-                    )
 
             # =================================================
             # TIPOS DE COMPROVANTES
@@ -1095,38 +1146,117 @@ if arquivo_enviado is not None:
                 "🔎 Tipos de comprovantes"
             )
 
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4 = st.columns(
+                4
+            )
 
             c1.metric(
                 "🔵 PIX",
-                resultado[
-                    "quantidade_pix"
-                ]
+                total_pix
             )
 
             c2.metric(
                 "🟢 Transferência",
-                resultado[
-                    "quantidade_transferencia"
-                ]
+                total_transferencias
             )
 
             c3.metric(
                 "🟠 Pagamento",
-                resultado[
-                    "quantidade_pagamento"
-                ]
+                total_pagamentos
             )
 
             c4.metric(
                 "🟣 Transação bancária",
-                resultado[
-                    "quantidade_transacao"
-                ]
+                total_transacoes
             )
 
             # =================================================
-            # DOWNLOAD ZIP
+            # RESULTADO POR PDF
+            # =================================================
+
+            st.subheader(
+                "📄 Resultado por PDF"
+            )
+
+            for resultado in resultados:
+
+                nome = resultado[
+                    "nome_original"
+                ]
+
+                total_pdf = resultado[
+                    "total_paginas"
+                ]
+
+                comprovantes_pdf = resultado[
+                    "total_comprovantes"
+                ]
+
+                sem_comprovantes_pdf = resultado[
+                    "total_sem_comprovantes"
+                ]
+
+                if comprovantes_pdf > 0:
+
+                    icone = "🔵"
+
+                else:
+
+                    icone = "🟢"
+
+                st.write(
+                    f"{icone} **{nome}**"
+                )
+
+                c1, c2, c3 = st.columns(
+                    3
+                )
+
+                with c1:
+
+                    st.write(
+                        f"Total: "
+                        f"**{total_pdf} página(s)**"
+                    )
+
+                with c2:
+
+                    st.write(
+                        f"Comprovantes: "
+                        f"**{comprovantes_pdf}**"
+                    )
+
+                with c3:
+
+                    st.write(
+                        f"Sem comprovantes: "
+                        f"**{sem_comprovantes_pdf}**"
+                    )
+
+            # =================================================
+            # ARQUIVOS COM ERRO
+            # =================================================
+
+            if erros:
+
+                st.warning(
+                    f"⚠️ {len(erros)} "
+                    f"PDF(s) apresentaram erro."
+                )
+
+                with st.expander(
+                    "⚠️ Ver arquivos com erro"
+                ):
+
+                    for item in erros:
+
+                        st.error(
+                            f"**{item['arquivo']}**\n\n"
+                            f"{item['erro']}"
+                        )
+
+            # =================================================
+            # DOWNLOAD
             # =================================================
 
             st.divider()
@@ -1137,28 +1267,33 @@ if arquivo_enviado is not None:
 
             st.success(
                 """
-O ZIP contém duas pastas:
+O ZIP foi criado com duas pastas:
 
-📁 **SEM_COMPROVANTES**
+🟢 **SEM_COMPROVANTES**
 
-📁 **COMPROVANTES**
+🔵 **COMPROVANTES**
+
+Cada arquivo mantém o nome original.
 """
             )
 
             st.write(
                 f"**Tamanho do ZIP:** "
-                f"{formatar_tamanho(resultado['tamanho_zip'])}"
+                f"{formatar_tamanho(len(dados_zip))}"
+            )
+
+            st.write(
+                f"**Tempo total:** "
+                f"{tempo_total:.1f} segundos"
             )
 
             st.download_button(
                 label=(
                     "⬇️ BAIXAR ZIP — "
-                    "ARQUIVOS SEPARADOS"
+                    "COMPROVANTES + SEM COMPROVANTES"
                 ),
 
-                data=resultado[
-                    "dados_zip"
-                ],
+                data=dados_zip,
 
                 file_name=(
                     "RESULTADO_COMPROVANTES.zip"
@@ -1174,35 +1309,36 @@ O ZIP contém duas pastas:
             )
 
             # =================================================
-            # CONFERÊNCIA DOS ARQUIVOS
+            # CONFERÊNCIA DE PÁGINAS
             # =================================================
 
-            st.divider()
-
             with st.expander(
-                "🔎 Conferir páginas de cada arquivo"
+                "🔎 Conferir páginas separadas"
             ):
 
-                for nome_arquivo, dados in resultado[
-                    "arquivos"
-                ].items():
+                for resultado in resultados:
 
                     st.write(
-                        f"### 📄 {nome_arquivo}"
+                        f"### 📄 "
+                        f"{resultado['nome_original']}"
                     )
 
                     st.write(
-                        "**🟢 SEM_COMPROVANTES**"
+                        "🟢 **SEM_COMPROVANTES**"
                     )
 
-                    if dados[
+                    if resultado[
                         "paginas_sem_comprovantes"
                     ]:
 
                         st.write(
-                            dados[
-                                "paginas_sem_comprovantes"
-                            ]
+                            "Páginas: "
+                            +
+                            str(
+                                resultado[
+                                    "paginas_sem_comprovantes"
+                                ]
+                            )
                         )
 
                     else:
@@ -1212,17 +1348,21 @@ O ZIP contém duas pastas:
                         )
 
                     st.write(
-                        "**🔵 COMPROVANTES**"
+                        "🔵 **COMPROVANTES**"
                     )
 
-                    if dados[
+                    if resultado[
                         "paginas_comprovantes"
                     ]:
 
                         st.write(
-                            dados[
-                                "paginas_comprovantes"
-                            ]
+                            "Páginas: "
+                            +
+                            str(
+                                resultado[
+                                    "paginas_comprovantes"
+                                ]
+                            )
                         )
 
                     else:
@@ -1237,24 +1377,33 @@ O ZIP contém duas pastas:
             # DIAGNÓSTICO
             # =================================================
 
-            if resultado[
-                "diagnostico"
-            ]:
+            diagnosticos = []
+
+            for resultado in resultados:
+
+                for mensagem in resultado[
+                    "diagnostico"
+                ]:
+
+                    diagnosticos.append(
+                        f"{resultado['nome_original']}: "
+                        f"{mensagem}"
+                    )
+
+            if diagnosticos:
 
                 with st.expander(
                     "⚠️ Diagnóstico"
                 ):
 
-                    for mensagem in resultado[
-                        "diagnostico"
-                    ]:
+                    for mensagem in diagnosticos:
 
                         st.write(
                             mensagem
                         )
 
         # =====================================================
-        # ERRO
+        # ERRO GERAL
         # =====================================================
 
         except Exception as erro:
